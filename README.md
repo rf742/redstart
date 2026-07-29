@@ -23,5 +23,14 @@ project.
 
 This is a module which provides vectors for fortran primitives (e.g. logical, integer, real, ...).
 
+The original source is in the `src/templates` directory, as this uses fypp to generate the same vector
+interface for different types.
 
+### red_random
+
+This module provides an ergonomic wrapper around the default rng found in Fortran. It allows for specification
+of custom ranges, and allows for generation of random integers as well.
+
+This program is an fypp template, as it generates shuffling functions for each of the different types of vectors
+available from red_vector.
 
