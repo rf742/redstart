@@ -1,3 +1,6 @@
+! Copyright (c) 2026 rf742
+! SPDX-License-Identifier: MIT
+
 module red_random
     use red_vector, only: string_vector, int_vector, real_vector
     implicit none

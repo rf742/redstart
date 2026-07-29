@@ -35,3 +35,7 @@ of custom ranges, and allows for generation of random integers as well.
 This program is an fypp template, as it generates shuffling functions for each of the different types of vectors
 available from red_vector.
 
+### red_string
+
+Gives a series of string utilities for convenience.
+

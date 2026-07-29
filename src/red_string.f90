@@ -1,6 +1,9 @@
+! Copyright (c) 2026 rf742
+! SPDX-License-Identifier: MIT
+
 !> A module for strings, containing conversion, case changing, and checking prefixes and suffixes.
 module red_string
-    use red_datastructures, only: string_vector
+    use red_vector, only: string_vector
     implicit none
     private
 
