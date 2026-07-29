@@ -1,0 +1,88 @@
+module red_random
+    use red_vector, only: string_vector, int_vector, real_vector
+    implicit none
+    private
+
+    public :: init_random
+    public :: get_rand_int
+    public :: get_rand_real
+    public :: get_rand_choice
+    public :: shuffle_array
+
+#:set TYPES = [ &
+    ('string_vector', '', "character(len=:), allocatable"), &
+    ('int_vector', 0, "integer"), &
+    ('real_vector', 0.0, "real"), &
+    ('logical_vector', '.false.', "logical")  &
+]
+
+    interface get_rand_choice
+    #:for name, default_val, individual_type in TYPES
+        module procedure get_rand_choice_${name}$
+    #:endfor
+    end interface
+
+    interface shuffle_array
+    #:for name, default_val, individual_type in TYPES
+        module procedure shuffle_array_${name}$
+    #:endfor
+    end interface
+
+contains
+
+    !> Initialize the random seed. Call this once at the start of your program.
+    !> Bare wrapper for now, in case we need to expand functionality or change how it is called
+    subroutine init_random()
+        call random_seed()
+    end subroutine init_random
+
+    !> Get a random integer between min_val and max_val (inclusive)
+    integer function get_rand_int(min_val, max_val) result(val)
+        integer, intent(in) :: min_val, max_val
+        real :: r
+        call random_number(r)
+        val = int(r * (max_val - min_val + 1)) + min_val
+    end function get_rand_int
+
+    !> Get a random real between min_val and max_val
+    real function get_rand_real(min_val, max_val) result(val)
+        real, intent(in) :: min_val, max_val
+        real :: r
+        call random_number(r)
+        val = r * (max_val - min_val) + min_val
+    end function get_rand_real
+
+    #:for name, default_val, individual_type in TYPES
+    !> Get a random choice from a ${name}$
+    function get_rand_choice_${name}$(arr) result(val)
+        type(${name}$), intent(in) :: arr
+        ${individual_type}$ :: val
+        integer :: idx
+        if (arr%length() == 0) then
+            val = ''
+            return
+        end if
+        idx = get_rand_int(1, arr%length())
+        val = arr%get(idx)
+    end function get_rand_choice_${name}$
+    #:endfor
+
+    #:for name, default_val, individual_type in TYPES
+    !> Shuffle a ${name}$ in-place using the Fisher-Yates algorithm
+    subroutine shuffle_${name}$(arr)
+        type(${name}$), intent(inout) :: arr
+        integer :: i, j
+        
+        if (arr%length() < 2) return
+        
+        do i = arr%length(), 2, -1
+            j = get_rand_int(1, i)
+            ! Note: arr%swap() can return stat=-1 if out of bounds.
+            ! We do not check for it here because i and j are strictly generated 
+            ! within [1, arr%length()], making out-of-bounds mathematically impossible.
+            if (i /= j) call arr%swap(i, j)
+        end do
+    end subroutine shuffle_string_vector
+    #:endfor
+
+end module red_random
