@@ -1,0 +1,295 @@
+! Copyright (c) 2026 rf742
+! SPDX-License-Identifier: MIT
+
+!> module provides vector types for fortran basic types.
+module red_vector
+    implicit none
+    private
+    
+    ! Expose public types
+    public :: f_string
+    
+#:set VECTORS = [ &
+    ('string', 'character(len=*)', 'character(len=:), allocatable', 'type(f_string)', '""', '%str', "=="), &
+    ('int', 'integer', 'integer', 'integer', '0', '', '=='), &
+    ('real', 'real', 'real', 'real', '0.0', '', "=="), &
+    ('logical', 'logical', 'logical', 'logical', '.false.', '', ".eqv.") &
+]
+
+! Note in the set VECTORS, element 6 mapped to equivalence is there because while intel ifx compiler will
+! allow logicals to be compared via ==, gfortran will not, so this ensures logicals get the proper .eqv. for equivlance.
+
+    ! Dynamically export vectors
+#:for name, intent_in_type, return_type, array_type, default_val, suffix, equivalence in VECTORS
+    public :: ${name}$_vector
+#:endfor
+
+    
+    !-------------------------------------------------------------------
+    ! f_string wrapper
+    !-------------------------------------------------------------------
+    !> A scalar wrapper type for dynamic strings to allow string arrays inside other types.
+    type :: f_string
+        character(len=:), allocatable :: str
+    end type f_string
+
+
+
+#:for name, intent_in_type, return_type, array_type, default_val, suffix, equivalence in VECTORS
+    !-------------------------------------------------------------------
+    ! ${name}$_vector
+    !-------------------------------------------------------------------
+    !> A dynamically resizing array for `${intent_in_type}$` elements.
+    type :: ${name}$_vector
+        private
+        integer :: current_size = 0
+        integer :: current_capacity = 0
+        ${array_type}$, allocatable :: data(:)
+    contains
+        procedure, public :: append => ${name}$_vector_append
+        procedure, public :: get => ${name}$_vector_get
+        procedure, public :: length => ${name}$_vector_length
+        procedure, public :: remove => ${name}$_vector_remove
+        procedure, public :: clear => ${name}$_vector_clear
+        procedure, public :: insert => ${name}$_vector_insert
+        procedure, public :: pop => ${name}$_vector_pop
+        procedure, public :: index_of => ${name}$_vector_index_of
+        procedure, public :: contains => ${name}$_vector_contains
+        procedure, public :: set => ${name}$_vector_set
+        procedure, public :: swap => ${name}$_vector_swap
+        procedure, public :: to_array => ${name}$_vector_to_array
+    end type ${name}$_vector
+    
+    interface ${name}$_vector
+        module procedure new_${name}$_vector
+    end interface ${name}$_vector
+#:endfor
+contains
+#:for name, intent_in_type, return_type, array_type, default_val, suffix, equivalence in VECTORS
+    ! --- ${name}$_vector methods ---
+    type(${name}$_vector) function new_${name}$_vector(initial_capacity) result(vec)
+        integer, intent(in), optional :: initial_capacity
+        integer :: cap
+        if (present(initial_capacity)) then
+            cap = initial_capacity
+        else
+            cap = 16
+        end if
+        vec%current_size = 0
+        vec%current_capacity = cap
+        allocate(vec%data(cap))
+    end function new_${name}$_vector
+    
+    subroutine ${name}$_vector_append(this, value)
+        class(${name}$_vector), intent(inout) :: this
+        ${intent_in_type}$, intent(in) :: value
+        ${array_type}$, allocatable :: temp_data(:)
+        integer :: new_capacity, i
+        
+        if (.not. allocated(this%data)) then
+            this%current_capacity = 16
+            this%current_size = 0
+            allocate(this%data(this%current_capacity))
+        end if
+        
+        if (this%current_size == this%current_capacity) then
+            if (this%current_capacity > 0) then
+                new_capacity = this%current_capacity * 2
+            else
+                new_capacity = 16
+            end if
+            allocate(temp_data(new_capacity))
+            if (this%current_size > 0) then
+                temp_data(1:this%current_size) = this%data(1:this%current_size)
+            end if
+            call move_alloc(temp_data, this%data)
+            this%current_capacity = new_capacity
+        end if
+        
+        this%current_size = this%current_size + 1
+        this%data(this%current_size)${suffix}$ = value
+    end subroutine ${name}$_vector_append
+    
+    function ${name}$_vector_get(this, index, stat) result(res)
+        class(${name}$_vector), intent(in) :: this
+        integer, intent(in) :: index
+        integer, intent(out), optional :: stat
+        ${return_type}$ :: res
+        if (index >= 1 .and. index <= this%current_size) then
+            res = this%data(index)${suffix}$
+            if (present(stat)) stat = 0
+        else
+            res = ${default_val}$
+            if (present(stat)) stat = -1
+        end if
+    end function ${name}$_vector_get
+    
+    integer function ${name}$_vector_length(this) result(len)
+        class(${name}$_vector), intent(in) :: this
+        len = this%current_size
+    end function ${name}$_vector_length
+
+
+
+subroutine ${name}$_vector_remove(this, index, stat)
+        class(${name}$_vector), intent(inout) :: this
+        integer, intent(in) :: index
+        integer, intent(out), optional :: stat
+        
+        if (index >= 1 .and. index <= this%current_size) then
+            ! Shift elements to the left using an array slice
+            if (index < this%current_size) then
+                this%data(index : this%current_size - 1) = this%data(index + 1 : this%current_size)
+            end if
+            
+            ! Clear the old final element
+            this%data(this%current_size)${suffix}$ = ${default_val}$
+            this%current_size = this%current_size - 1
+            if (present(stat)) stat = 0
+        else
+            if (present(stat)) stat = -1
+        end if
+    end subroutine ${name}$_vector_remove
+
+
+subroutine ${name}$_vector_insert(this, index, value, stat)
+        class(${name}$_vector), intent(inout) :: this
+        integer, intent(in) :: index
+        ${intent_in_type}$, intent(in) :: value
+        integer, intent(out), optional :: stat
+        ${array_type}$, allocatable :: temp_data(:)
+        integer :: new_capacity
+        
+        ! Boundary check
+        if (index < 1 .or. index > this%current_size + 1) then
+            if (present(stat)) stat = -1
+            return
+        else
+            if (present(stat)) stat = 0
+        end if
+        
+        ! 1. Expand capacity if the vector is full
+        if (this%current_size == this%current_capacity) then
+            if (this%current_capacity > 0) then
+                new_capacity = this%current_capacity * 2
+            else
+                new_capacity = 16
+            end if
+            
+            allocate(temp_data(new_capacity))
+            
+            ! Copy existing data to the new array
+            if (this%current_size > 0) then
+                #:if name == 'string'
+                temp_data(1:this%current_size) = this%data(1:this%current_size)
+                #:else
+                temp_data(1:this%current_size) = this%data(1:this%current_size)
+                #:endif
+            end if
+            
+            call move_alloc(temp_data, this%data)
+            this%current_capacity = new_capacity
+        end if
+        
+        ! 2. Shift elements to the right to make room for the new value
+        ! This safely ignores the shift if appending exactly at the end
+        if (index <= this%current_size) then
+            this%data(index + 1 : this%current_size + 1) = this%data(index : this%current_size)
+        end if
+        
+        ! 3. Insert the new value and increment size
+        this%data(index)${suffix}$ = value
+        this%current_size = this%current_size + 1
+        
+    end subroutine ${name}$_vector_insert
+
+
+
+
+
+    function ${name}$_vector_pop(this) result(res)
+        class(${name}$_vector), intent(inout) :: this
+        ${return_type}$ :: res
+        if (this%current_size > 0) then
+            res = this%data(this%current_size)${suffix}$
+            call this%remove(this%current_size)
+        else
+            res = ${default_val}$
+        end if
+    end function ${name}$_vector_pop
+
+    integer function ${name}$_vector_index_of(this, value) result(idx)
+        class(${name}$_vector), intent(in) :: this
+        ${intent_in_type}$, intent(in) :: value
+        integer :: i
+        idx = 0
+        do i = 1, this%current_size
+            if (this%data(i)${suffix}$ ${equivalence}$ value) then
+                idx = i
+                return
+            end if
+        end do
+    end function ${name}$_vector_index_of
+
+    logical function ${name}$_vector_contains(this, value) result(res)
+        class(${name}$_vector), intent(in) :: this
+        ${intent_in_type}$, intent(in) :: value
+        res = (this%index_of(value) > 0)
+    end function ${name}$_vector_contains
+
+    subroutine ${name}$_vector_set(this, index, value, stat)
+        class(${name}$_vector), intent(inout) :: this
+        integer, intent(in) :: index
+        ${intent_in_type}$, intent(in) :: value
+        integer, intent(out), optional :: stat
+        
+        if (index >= 1 .and. index <= this%current_size) then
+            this%data(index)${suffix}$ = value
+            if (present(stat)) stat = 0
+        else
+            if (present(stat)) stat = -1
+        end if
+    end subroutine ${name}$_vector_set
+
+    subroutine ${name}$_vector_swap(this, index1, index2, stat)
+        class(${name}$_vector), intent(inout) :: this
+        integer, intent(in) :: index1, index2
+        integer, intent(out), optional :: stat
+        ${return_type}$ :: temp
+        
+        if (index1 >= 1 .and. index1 <= this%current_size .and. &
+            index2 >= 1 .and. index2 <= this%current_size) then
+            temp = this%data(index1)${suffix}$
+            this%data(index1)${suffix}$ = this%data(index2)${suffix}$
+            this%data(index2)${suffix}$ = temp
+            if (present(stat)) stat = 0
+        else
+            if (present(stat)) stat = -1
+        end if
+    end subroutine ${name}$_vector_swap
+
+
+    function ${name}$_vector_to_array(this) result(arr)
+        class(${name}$_vector), intent(in) :: this
+        ${array_type}$, allocatable :: arr(:)
+
+        if (this%current_size > 0) then
+            arr = this%data(1:this%current_size)
+        else
+            allocate(arr(0))
+        end if
+    end function ${name}$_vector_to_array
+
+subroutine ${name}$_vector_clear(this)
+        class(${name}$_vector), intent(inout) :: this
+        if (allocated(this%data)) then
+            deallocate(this%data)
+        end if
+        this%current_size = 0
+        this%current_capacity = 0
+    end subroutine ${name}$_vector_clear
+
+    
+#:endfor
+
+end module red_vector
