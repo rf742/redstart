@@ -42,3 +42,8 @@ Gives a series of string utilities for convenience.
 ### red_ioutil
 
 Convenient wrapper around basic input and output, to screen or file.
+
+### red_datetime
+
+Module for working with dates and times. Can handle a few different formats,
+date arithmetic, and stopwatch functionality.
