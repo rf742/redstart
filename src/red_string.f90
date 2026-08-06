@@ -71,7 +71,6 @@ contains
     ! Tokenize a string into an array of strings,
     ! respecting a given delimiter (default space) and keeping double-quoted strings intact.
     subroutine tokenize(str, tokens, count, delimiter)
-        use red_datastructures, only: string_vector
         character(len=*), intent(in) :: str
         type(string_vector), intent(out) :: tokens
         integer, intent(out) :: count
