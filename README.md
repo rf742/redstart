@@ -39,3 +39,6 @@ available from red_vector.
 
 Gives a series of string utilities for convenience.
 
+### red_ioutil
+
+Convenient wrapper around basic input and output, to screen or file.
