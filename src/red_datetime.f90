@@ -1,3 +1,6 @@
+! Copyright (c) 2026 rf742
+! SPDX-License-Identifier: MIT
+
 module red_datetime
     use red_string, only: int_to_str
     implicit none

@@ -2,7 +2,7 @@
 ! SPDX-License-Identifier: MIT
 
 module red_random
-    use red_vector, only: string_vector, int_vector, real_vector
+    use red_vector
     implicit none
     private
 
@@ -10,10 +10,9 @@ module red_random
     public :: get_rand_int
     public :: get_rand_real
     public :: get_rand_choice
-    public :: shuffle_array
 
 #:set TYPES = [ &
-    ('string_vector', '', "character(len=:), allocatable"), &
+    ('string_vector', "''", "character(len=:), allocatable"), &
     ('int_vector', 0, "integer"), &
     ('real_vector', 0.0, "real"), &
     ('logical_vector', '.false.', "logical")  &
@@ -25,11 +24,6 @@ module red_random
     #:endfor
     end interface
 
-    interface shuffle_array
-    #:for name, default_val, individual_type in TYPES
-        module procedure shuffle_array_${name}$
-    #:endfor
-    end interface
 
 contains
 
@@ -62,7 +56,7 @@ contains
         ${individual_type}$ :: val
         integer :: idx
         if (arr%length() == 0) then
-            val = ''
+            val = ${default_val}$
             return
         end if
         idx = get_rand_int(1, arr%length())
@@ -85,7 +79,7 @@ contains
             ! within [1, arr%length()], making out-of-bounds mathematically impossible.
             if (i /= j) call arr%swap(i, j)
         end do
-    end subroutine shuffle_string_vector
+    end subroutine shuffle_${name}$
     #:endfor
 
 end module red_random
