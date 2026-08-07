@@ -23,6 +23,10 @@ project.
 
 ## Modules
 
+### red_errors
+
+Provides the type red_error that is used for error reporting in different modules of this system.
+
 ### red_vector
 
 This is a module which provides vectors for fortran primitives (e.g. logical, integer, real, ...).
